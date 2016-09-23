@@ -10,6 +10,11 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.misc.Signal;
+import sun.misc.SignalHandler;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author malongbo
@@ -17,10 +22,12 @@ import org.slf4j.LoggerFactory;
 public class DefaultServer  implements Server{
     private Config cfg;
     private Logger log;
+    private Map<String, SignalHandler> signalHandlers;
 
     public DefaultServer(Config cfg) {
         this.cfg = cfg;
         this.log = LoggerFactory.getLogger("");
+        signalHandlers = new HashMap<String, SignalHandler>();
     }
 
     public void setLogger(Logger logger) {
@@ -31,7 +38,36 @@ public class DefaultServer  implements Server{
 
     }
 
+    public void handleSignal(String signal, SignalHandler handler) {
+        signalHandlers.put(signal, handler);
+    }
+
+    private void registerSignals() {
+        Signal.handle(new Signal("USR2"), new SignalHandler() {
+            public void handle(Signal signal) {
+                if (signalHandlers.get("USR2") != null) {
+                    signalHandlers.get("USR2").handle(signal);
+                }
+            }
+        });
+    }
+
     public void run() {
+        // handle signal
+        registerSignals();
+
+        log.debug(String.format("pid is %d", Util.getPID()));
+
+        // parse mapping
+
+        // serve
+        serve();
+    }
+
+    /**
+     * 启动 HTTP 服务
+     */
+    private void serve() {
         EventLoopGroup bossGroup = new NioEventLoopGroup(1);
         EventLoopGroup workerGroup = new NioEventLoopGroup();
 
@@ -52,6 +88,5 @@ public class DefaultServer  implements Server{
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
         }
-
     }
 }
